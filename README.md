@@ -131,13 +131,13 @@ model](#security-model) below.
 ### macOS / Linux / WSL2
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/a2abridge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vbcherepanov/a2abridge/main/install.sh | bash
 ```
 
 ### Windows (PowerShell as user, no admin)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/<owner>/a2abridge/main/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/vbcherepanov/a2abridge/main/install.ps1 | iex
 ```
 
 ### What the installer does
@@ -147,8 +147,8 @@ iwr -useb https://raw.githubusercontent.com/<owner>/a2abridge/main/install.ps1 |
 3. Detects installed IDEs and writes the MCP block to each one's config — with timestamped `.bak` next to the original:
    - Claude Code → `~/.claude.json` (hooks stay in `~/.claude/settings.json`)
    - Codex CLI → `~/.codex/config.toml`
-   - Cline (VS Code) → `~/.config/Code/User/settings.json` (`cline.mcpServers`)
-   - Continue → `~/.continue/config.json`
+   - Cline (VS Code) → `<vs-code-globalStorage>/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+   - Continue → `~/.continue/mcpServers/a2a.yaml`
    - Cursor → `~/.cursor/mcp.json`
    - Gemini CLI → `~/.gemini/settings.json`
    - Antigravity CLI → `~/.gemini/config/mcp_config.json`
@@ -340,10 +340,11 @@ in the directory.
 ## Manual install (no curl)
 
 ```bash
-git clone https://github.com/<owner>/a2abridge ~/PROJECT/a2abridge
+git clone https://github.com/vbcherepanov/a2abridge ~/PROJECT/a2abridge
 cd ~/PROJECT/a2abridge
 go build -o ~/.a2abridge/bin/a2abridge ./cmd/a2abridge
-~/.a2abridge/bin/a2abridge install --ide auto
+~/.a2abridge/bin/a2abridge install --ide auto --apply
+~/.a2abridge/bin/a2abridge service install
 ```
 
 ## Architecture
@@ -379,7 +380,7 @@ go build -o ~/.a2abridge/bin/a2abridge ./cmd/a2abridge
 
 | Command | What |
 |---|---|
-| `a2abridge install [--ide auto\|claude-code,codex,...] [--dry-run] [--apply]` | Detect IDEs, write MCP configs (`.bak` backups), install service, install skill, register UserPromptSubmit hook |
+| `a2abridge install [--ide auto\|claude-code,codex,...] [--dry-run] [--apply]` | Detect IDEs, write MCP configs (`.bak` backups), install skill, register UserPromptSubmit hook; dry-run unless `--apply` |
 | `a2abridge directory [--addr 127.0.0.1:7777]` | Run discovery service (used by the system service unit) |
 | `a2abridge bridge` | Run as MCP stdio server (used by IDEs, do not call manually) |
 | `a2abridge service {install\|start\|stop\|restart\|status\|uninstall}` | Manage the directory daemon under launchd / systemd-user / Windows Service |
@@ -475,8 +476,8 @@ a2abridge doctor
 Output is a table of checks, each PASS/WARN/FAIL with a fix hint. Typical failures:
 
 - **directory not running** → `a2abridge service start`
-- **port 7777 in use** → `a2abridge service uninstall && a2abridge install --directory-port 7778`
-- **IDE config missing the MCP block** → re-run `a2abridge install --ide claude-code`
+- **port 7777 in use** → `a2abridge service uninstall && a2abridge service install --addr 127.0.0.1:7778 && a2abridge install --apply --directory http://127.0.0.1:7778`
+- **IDE config missing the MCP block** → re-run `a2abridge install --ide claude-code --apply`
 - **inbox stale** → `rm ./.a2a/inbox.json` (the bridge rebuilds it on the next message)
 - **a bridge exits right after start with `port already held by another bridge, deferring`** → another bridge already serves this agent on that address; exactly one bridge runs per agent, and a bridge shuts down when its MCP host exits
 - **two Claude windows clobbering each other in the directory** → set distinct `A2A_ID` env per window
@@ -505,8 +506,8 @@ Metrics: the directory and every bridge serve Prometheus metrics at `/metrics`.
 |---|---|---|
 | Claude Code | `~/.claude.json` (hooks in `~/.claude/settings.json`) | yes |
 | Codex CLI | `~/.codex/config.toml` | yes |
-| Cline (VS Code) | `cline.mcpServers` in VS Code settings | yes |
-| Continue | `~/.continue/config.json` | yes |
+| Cline (VS Code) | `<vs-code-globalStorage>/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` | yes |
+| Continue | `~/.continue/mcpServers/a2a.yaml` | yes |
 | Cursor | `~/.cursor/mcp.json` | yes |
 | Gemini CLI | `~/.gemini/settings.json` | yes |
 | Antigravity CLI | `~/.gemini/config/mcp_config.json` | best-effort |
@@ -620,7 +621,7 @@ otherwise we skip it.
 Issues and PRs welcome. The code base is small (~2k LOC of Go) and the spec is fixed, so contributions are easy to scope.
 
 ```bash
-git clone https://github.com/<owner>/a2abridge
+git clone https://github.com/vbcherepanov/a2abridge
 cd a2abridge
 go test ./...
 go build ./cmd/a2abridge

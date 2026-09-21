@@ -96,8 +96,9 @@ func AllWriters() []Writer {
 
 // WriterFound reports whether the writer's Detect() target exists on disk.
 // Detect may legitimately return a directory marker (Continue's ~/.continue,
-// Claude Code's ~/.claude) — any existing path counts as "installed". Used
-// by `a2abridge install` (--ide=auto) and `a2abridge uninstall`.
+// Claude Code's ~/.claude, Codex's ~/.codex, Cursor's ~/.cursor) — any
+// existing path counts as "installed". Used by `a2abridge install`
+// (--ide=auto) and `a2abridge uninstall`.
 func WriterFound(w Writer) bool {
 	p := w.Detect()
 	if p == "" {
@@ -118,7 +119,11 @@ func RemoveMCPEntry(w Writer, path string) error {
 	}
 	switch w.(type) {
 	case *codexWriter:
-		return removeCodexEntry(path)
+		// Detect may return the ~/.codex marker; the entry lives in config.toml.
+		return removeCodexEntry(codexWriter{}.writeTarget())
+	case *cursorWriter:
+		// Detect may return the ~/.cursor marker; the entry lives in mcp.json.
+		return removeJSONMCPEntry(cursorWriter{}.writeTarget())
 	case *continueWriter:
 		return removeContinueFile(path)
 	case *antigravityWriter:

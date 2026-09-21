@@ -1,7 +1,7 @@
 # install.ps1 — one-line installer for Windows (PowerShell 5.1+ or 7).
 #
 # Typical usage:
-#   iwr -useb https://raw.githubusercontent.com/<owner>/a2abridge/main/install.ps1 | iex
+#   iwr -useb https://raw.githubusercontent.com/vbcherepanov/a2abridge/main/install.ps1 | iex
 #
 # With flags:
 #   $env:A2A_VERSION = "v0.2.0"; iwr -useb ... | iex

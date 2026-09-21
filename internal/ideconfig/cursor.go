@@ -11,7 +11,25 @@ type cursorWriter struct{}
 
 func (cursorWriter) Name() string { return "Cursor" }
 
-func (cursorWriter) Detect() string {
+// Detect answers "is Cursor installed?". Cursor creates ~/.cursor (argv.json,
+// extensions) on first launch but mcp.json only when the first MCP server is
+// added, so the directory also counts as a marker.
+func (w cursorWriter) Detect() string {
+	if target := w.writeTarget(); fileExists(target) {
+		return target
+	}
+	h, err := homeDir()
+	if err != nil {
+		return ""
+	}
+	if marker := filepath.Join(h, ".cursor"); dirExists(marker) {
+		return marker
+	}
+	return ""
+}
+
+// writeTarget is the global MCP config Cursor reads.
+func (cursorWriter) writeTarget() string {
 	h, err := homeDir()
 	if err != nil {
 		return ""
@@ -20,7 +38,7 @@ func (cursorWriter) Detect() string {
 }
 
 func (w cursorWriter) Write(spec Spec, dryRun bool) Result {
-	return writeJSONConfig(w.Name(), w.Detect(), dryRun, func(root map[string]any) bool {
+	return writeJSONConfig(w.Name(), w.writeTarget(), dryRun, func(root map[string]any) bool {
 		return setMCPServerEntry(root, spec)
 	})
 }

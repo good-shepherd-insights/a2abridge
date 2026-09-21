@@ -4,6 +4,20 @@ All notable changes to a2abridge are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.2] — 2026-09-21
+
+### Fixed
+
+- **`a2abridge install` detects fresh Codex CLI and Cursor installs.** Both
+  create `~/.codex` / `~/.cursor` on first run, but `config.toml` /
+  `mcp.json` only after the user adds a setting or MCP server. Auto-detection
+  required that file, so the one-line installer skipped both clients on a
+  new machine. The state directory now counts as a marker, the MCP block is
+  written to the config file, and `uninstall` cleans it from the same file.
+- README: the quick-start install URLs carried an `<owner>` placeholder that
+  breaks `curl | bash`; Cline and Continue config paths, the manual-install
+  `--apply` step, and the port-change recipe now match the CLI.
+
 ## [4.0.1] — 2026-09-15
 
 ### Fixed

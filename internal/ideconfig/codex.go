@@ -21,7 +21,25 @@ type codexWriter struct{}
 
 func (codexWriter) Name() string { return "Codex CLI" }
 
-func (codexWriter) Detect() string {
+// Detect answers "is Codex CLI installed?". Codex creates ~/.codex on first
+// run (auth.json, history) but config.toml only once the user adds a setting,
+// so the state directory also counts as a marker.
+func (w codexWriter) Detect() string {
+	if target := w.writeTarget(); fileExists(target) {
+		return target
+	}
+	h, err := homeDir()
+	if err != nil {
+		return ""
+	}
+	if marker := filepath.Join(h, ".codex"); dirExists(marker) {
+		return marker
+	}
+	return ""
+}
+
+// writeTarget is the global config Codex CLI reads MCP servers from.
+func (codexWriter) writeTarget() string {
 	h, err := homeDir()
 	if err != nil {
 		return ""
@@ -31,7 +49,7 @@ func (codexWriter) Detect() string {
 
 func (w codexWriter) Write(spec Spec, dryRun bool) Result {
 	res := Result{IDE: w.Name(), DryRun: dryRun}
-	path := w.Detect()
+	path := w.writeTarget()
 	if path == "" {
 		res.Error = fmt.Errorf("could not resolve Codex config path")
 		return res
