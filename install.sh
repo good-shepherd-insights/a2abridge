@@ -2,8 +2,8 @@
 # install.sh — one-line installer for macOS / Linux / WSL2.
 #
 # Typical usage:
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/a2abridge/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/a2abridge/main/install.sh | bash -s -- --version v2.1.0
+#   curl -fsSL https://raw.githubusercontent.com/vbcherepanov/a2abridge/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/vbcherepanov/a2abridge/main/install.sh | bash -s -- --version v2.1.0
 #
 # Env overrides:
 #   A2A_REPO         GitHub repo in owner/name form (default: vbcherepanov/a2abridge)
