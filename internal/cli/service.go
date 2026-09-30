@@ -167,6 +167,42 @@ func buildService(addr string) (service.Service, *directoryService, error) {
 	return svc, prog, nil
 }
 
+// systemdUserScript is kardianos/service v1.3.0's built-in systemd template
+// (service_systemd_linux.go, const systemdScript), copied verbatim except for
+// the final WantedBy line. The upstream template hardcodes
+// WantedBy=multi-user.target even for `systemd --user` units, where that
+// target doesn't exist — `systemctl --user enable` silently accepts it, but
+// the unit never actually starts at login/boot (even with loginctl
+// enable-linger). default.target is the correct target for a user-manager
+// unit. Field/function syntax here is kardianos's own minimal template
+// engine (template.go), not text/template — no leading dots.
+const systemdUserScript = `[Unit]
+Description={{Description}}
+ConditionFileIsExecutable={{Path | cmdEscape}}
+{{range Dependencies}}{{.}}
+{{end}}
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+ExecStart={{Path | cmdEscape}}{{range Arguments}} {{. | cmd}}{{end}}
+{{if ChRoot}}RootDirectory={{ChRoot | cmd}}
+{{end}}{{if WorkingDirectory}}WorkingDirectory={{WorkingDirectory | cmdEscape}}
+{{end}}{{if UserName}}User={{UserName}}
+{{end}}{{if ReloadSignal}}ExecReload=/bin/kill -{{ReloadSignal}} "$MAINPID"
+{{end}}{{if PIDFile}}PIDFile={{PIDFile | cmd}}
+{{end}}{{if OutputFileSupport}}StandardOutput=file:{{LogDirectory}}/{{Name}}.out
+StandardError=file:{{LogDirectory}}/{{Name}}.err
+{{end}}{{if LimitNOFILE}}LimitNOFILE={{LimitNOFILE}}
+{{end}}{{if Restart}}Restart={{Restart}}
+{{end}}{{if SuccessExitStatus}}SuccessExitStatus={{SuccessExitStatus}}
+{{end}}RestartSec=120
+EnvironmentFile=-/etc/sysconfig/{{Name}}
+
+{{range EnvVars}}{{.}}
+{{end}}[Install]
+WantedBy=default.target
+`
+
 // platformOptions returns the kardianos/service option map appropriate for
 // the current OS. We always run as a USER service (no root) — no admin
 // prompt on install, and per-user isolation between machines with multiple
@@ -182,6 +218,17 @@ func platformOptions() service.KeyValue {
 		opt["UserService"] = true // ~/.config/systemd/user
 		opt["Restart"] = "on-failure"
 		opt["LogOutput"] = true
+		// kardianos/service's built-in systemd template ignores UserService
+		// when picking a log directory (defaults to /var/log, which a
+		// non-root user can't write to — the unit fails at startup with
+		// "Failed to set up standard output: Permission denied") and always
+		// emits WantedBy=multi-user.target, a system-manager target that
+		// doesn't exist inside a `systemd --user` instance. Point logs at a
+		// writable per-user path and swap in a corrected unit template.
+		if dir, ok := linuxLogDirectory(); ok {
+			opt["LogDirectory"] = dir
+		}
+		opt["SystemdScript"] = systemdUserScript
 		// systemd will only auto-start at login if `loginctl enable-linger <user>`
 		// — we surface this in `a2abridge doctor`.
 	case "windows":
@@ -191,6 +238,17 @@ func platformOptions() service.KeyValue {
 		opt["StartType"] = "automatic"
 	}
 	return opt
+}
+
+// linuxLogDirectory returns the writable per-user path used for
+// StandardOutput/StandardError in systemdUserScript, mirroring the value
+// platformOptions bakes into the unit's LogDirectory option.
+func linuxLogDirectory() (string, bool) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", false
+	}
+	return filepath.Join(home, ".local", "state", "a2abridge"), true
 }
 
 // svcInstall: install + start. We accept --addr to allow non-default port,
@@ -213,6 +271,18 @@ func svcInstall(args []string, stdout, stderr io.Writer) int {
 		if err := provisionFederation(*cn, stdout, stderr); err != nil {
 			fmt.Fprintf(stderr, "a2abridge service install --federation: %v\n", err)
 			return 1
+		}
+	}
+
+	if runtime.GOOS == "linux" {
+		// systemd's `StandardOutput=file:` does not create missing parent
+		// directories — the unit fails at startup ("Permission denied" or
+		// ENOENT) if LogDirectory doesn't already exist.
+		if dir, ok := linuxLogDirectory(); ok {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				fmt.Fprintf(stderr, "a2abridge service install: create log directory %s: %v\n", dir, err)
+				return 1
+			}
 		}
 	}
 
